@@ -56,7 +56,7 @@ def test_bug2():
         d2, paths = dtw.warping_paths(s1, s2, window=2)
         best_path = dtw.best_path(paths)
         if not dtwvis.test_without_visualization():
-            dtwvis.plot_warpingpaths(s1, s2, paths, best_path, filename=fn, shownumbers=False)
+            dtwvis.plot_warpingpaths(s1, s2, paths, path=best_path, filename=fn, shownumbers=False)
             print("Figure saved to", fn)
 
         assert d1a == pytest.approx(d2)
@@ -73,7 +73,7 @@ def test_bug3():
             np.array([1., 2, 0, 0, 0, 0, 0, 1, 1, 3, 4, 5]),
             np.array([0., 0, 1, 2, 1, 0, 1]),
             np.array([0., 1, 2, 0, 0, 0, 0, 0]),
-            np.array([1., 2, 0, 0, 0, 0, 0, 1, 1])])
+            np.array([1., 2, 0, 0, 0, 0, 0, 1, 1])], dtype=object)
         ds = dtw.distance_matrix(series)
         print(ds)
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
     logger.addHandler(sh)
     logger.propagate = 0
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
-    print(f"Saving files to {directory}")
+    print("Saving files to {}".format(directory))
     # test_bug1()
     test_bug2()
     # test_bug3()

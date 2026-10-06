@@ -164,11 +164,11 @@ def test_trace_kmeans():
         tic = time.perf_counter()
         model = KMeans(k=k, max_it=max_it, max_dba_it=max_dba_it, drop_stddev=1,
                        nb_prob_samples=0,
-                       dists_options={"window": window},
+                       dists_options={"window": window, "use_c": True},
                        initialize_with_kmedoids=False,
                        initialize_with_kmeanspp=True)
         try:
-            cluster_idx, performed_it = model.fit(series, use_c=True, use_parallel=False)
+            cluster_idx, performed_it = model.fit(series, use_parallel=False)
         except PyClusteringException:
             return
         toc = time.perf_counter()
@@ -205,7 +205,7 @@ def test_trace_kmeans():
 
 
 @numpyonly
-
+@scipyonly
 def test_trace_kmeans_differencing():
     with util_numpy.test_uses_numpy() as np, util_numpy.test_uses_scipy() as scipy:
         k = 4
@@ -243,11 +243,11 @@ def test_trace_kmeans_differencing():
         tic = time.perf_counter()
         model = KMeans(k=k, max_it=max_it, max_dba_it=max_dba_it, drop_stddev=1,
                        nb_prob_samples=nb_prob_samples,
-                       dists_options={"window": window},
+                       dists_options={"window": window, "use_c": use_c},
                        initialize_with_kmedoids=False,
                        initialize_with_kmeanspp=True)
         try:
-            cluster_idx, performed_it = model.fit(series, use_c=use_c, use_parallel=False)
+            cluster_idx, performed_it = model.fit(series, use_parallel=False)
         except PyClusteringException:
             return
         toc = time.perf_counter()
@@ -319,10 +319,10 @@ def test_nparray_kmeans():
         # Perform k-means
         tic = time.perf_counter()
         model = KMeans(k=k, max_it=max_it, max_dba_it=max_dba_it,
-                       dists_options={"window": window},
+                       dists_options={"window": window, "use_c": True},
                        initialize_with_kmedoids=False,
                        initialize_with_kmeanspp=True)
-        cluster_idx, performed_it = model.fit(series, use_c=True, use_parallel=False)
+        cluster_idx, performed_it = model.fit(series, use_parallel=False)
         toc = time.perf_counter()
         print(f'DBA ({performed_it} iterations: {toc - tic:0.4f} sec')
 
@@ -422,8 +422,10 @@ def test_ndim_barycenter2():
 
 
 @numpyonly
-@pytest.mark.parametrize("use_c,use_parallel", [(False,False), (True,False), (False,True), (True,True)])
-def test_ndim_kmeans(use_c, use_parallel):
+@pytest.mark.parametrize("use_c,use_parallel,kmeanspp",
+                         [(False,False,False), (True,False,False), (False,True,False), (True,True,False),
+                          (False,False,True)])
+def test_ndim_kmeans(use_c, use_parallel, kmeanspp):
     with util_numpy.test_uses_numpy() as np:
         random.seed(3980)
         np.random.seed(3980)
@@ -441,17 +443,21 @@ def test_ndim_kmeans(use_c, use_parallel):
         # Perform k-means
         tic = time.perf_counter()
         model = KMeans(k=k, max_it=max_it, max_dba_it=max_dba_it, drop_stddev=2,
-                       dists_options={"window": window},
+                       dists_options={"window": window, "use_c": use_c},
                        initialize_with_kmedoids=False,
-                       initialize_with_kmeanspp=False)
-        cluster_idx, performed_it = model.fit(series, use_c=use_c, use_parallel=use_parallel)
+                       initialize_with_kmeanspp=kmeanspp)
+        cluster_idx, performed_it = model.fit(series, use_parallel=use_parallel)
         toc = time.perf_counter()
         # print(f'DBA ({performed_it} iterations: {toc - tic:0.4f} sec')
         # for ki in range(k):
         #     print(f'Cluster {ki+1}: {model.cluster_idx[ki]}')
         #     print(model.means[ki])
-        assert set(model.cluster_idx[0]) == {1, 2, 4, 5}, f'{model.cluster_idx[0]} != {{1, 2, 4, 5}}'
-        assert set(model.cluster_idx[1]) == {0, 3}, f'{model.cluster_idx[1]} != {{0, 3}}'
+        if kmeanspp is False:
+            assert set(model.cluster_idx[0]) == {1, 2, 4, 5}, f'{model.cluster_idx[0]} != {{1, 2, 4, 5}}'
+            assert set(model.cluster_idx[1]) == {0, 3}, f'{model.cluster_idx[1]} != {{0, 3}}'
+        else:
+            assert set(model.cluster_idx[0]) == {0, 1, 3, 4}, f'{model.cluster_idx[0]} != {{0, 1, 3, 4}}'
+            assert set(model.cluster_idx[1]) == {2, 5}, f'{model.cluster_idx[1]} != {{2, 5}}'
 
 
 @numpyonly
@@ -472,10 +478,10 @@ def test_ndim_kmeans2():
         # Perform k-means
         tic = time.perf_counter()
         model = KMeans(k=k, max_it=max_it, max_dba_it=max_dba_it, drop_stddev=2,
-                       dists_options={"window": window},
+                       dists_options={"window": window, "use_c": False},
                        initialize_with_kmedoids=False,
                        initialize_with_kmeanspp=False)
-        cluster_idx, performed_it = model.fit(series, use_c=False, use_parallel=False)
+        cluster_idx, performed_it = model.fit(series, use_parallel=False)
         toc = time.perf_counter()
         # print(f'DBA ({performed_it} iterations: {toc - tic:0.4f} sec')
         assert set(model.cluster_idx[0]) == {1, 2, 4, 5}, f'{model.cluster_idx[0]} != {{1, 2, 4, 5}}'
@@ -486,7 +492,7 @@ if __name__ == "__main__":
     logger.setLevel(logging.DEBUG)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
-    print(f"Saving files to {directory}")
+    print("Saving files to {}".format(directory))
     # test_pair()
     # test_trace()
     # test_trace_mask()
@@ -494,8 +500,8 @@ if __name__ == "__main__":
     # test_trace_kmeans_differencing()
     # test_nparray_kmeans()
     # test_barycenter()
-    # test_ndim_barycenter_single()
+    test_ndim_barycenter_single()
     # test_ndim_barycenter()
     # test_ndim_barycenter2()
-    test_ndim_kmeans(use_c=False, use_parallel=False)
+    # test_ndim_kmeans(use_c=False, use_parallel=False, kmeanspp=True)
     # test_ndim_kmeans2()

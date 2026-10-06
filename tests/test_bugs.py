@@ -8,11 +8,11 @@ import pytest
 
 from dtaidistance import dtw, util_numpy
 from dtaidistance import dtw_visualisation as dtwvis
-from dtaidistance.exceptions import MatplotlibException
 
 directory = None
 logger = logging.getLogger("be.kuleuven.dtai.distance")
 numpyonly = pytest.mark.skipif("util_numpy.test_without_numpy()")
+pandasonly = pytest.mark.skipif("util_numpy.test_without_pandas()")
 
 
 @numpyonly
@@ -117,14 +117,11 @@ def test_distance3_a():
         assert d1 == pytest.approx(d2)
 
 
+@pytest.mark.skip("Pandas is not a mandatory requirement")
 @numpyonly
+@pandasonly
 def test_distance4():
-    with util_numpy.test_uses_numpy(strict=False) as np:
-        try:
-            import pandas as pd
-        except ImportError:
-            # If no pandas, ignore test (not a required dependency)
-            return
+    with util_numpy.test_uses_numpy(strict=False) as np, util_numpy.test_uses_pandas() as pd:
         s = [[0.,    0.,   0.,    0.,   0.,   0., 0., 0., 0., 0., 0., 0., 0.],
              [0.005, 0.01, 0.015, 0.02, 0.01, 0., 0., 0., 0., 0., 0., 0., 0.],
              [0.,    0.,   0.,    0.,   0.,   0., 0., 0., 0., 0., 0., 0., 0.]]
@@ -315,6 +312,63 @@ def test_bug_size():
         assert d1 == pytest.approx(d2)
 
 
+@numpyonly
+def test_bug5_path():
+    """
+    without psi: [(0, 0), (0, 1), (1, 2), (1, 3), (2, 4)]
+    with psi:            [(0, 1), (1, 2), (1, 3), (2, 4)]
+
+    Why is this not (with psi): [(2,4), (1,3), (0,2)] ?
+    Answer:
+    Numerical inaccuracies. When choosing the best path from (1,3) the
+    three options are [1.0, 1.9999999999999996, 0.9999999999999996].
+    Thus moving left (last one) is chosen instead of the expected diagonal.
+
+    In theory:
+    Path 1: (0,2), (1,3), (2,4) = sqrt(1**2 + 0 + 0) = 1
+    Path 2: (0,1), (1,2), (1,3), (2,4) = sqrt(0 + 1**2 + 0 + 0) = 1
+    And path 1 should be chosen because the diagonal move has priority.
+
+    In practice, floating point inaccuracies:
+    Path 1: (2.1-3.1) = 1.0
+    Path 2: (4.1-3.1) = 0.9999999999999996
+
+    """
+    with util_numpy.test_uses_numpy() as np:
+        s1 = np.array([2.1, 4.1, 5.1])
+        s2 = np.array([1.1, 2.1, 3.1, 4.1, 5.1])
+        d1, wps = dtw.warping_paths(s1, s2, psi=[0, 0, len(s2), len(s2)])
+        best_path = dtw.best_path(wps)
+        print(best_path)
+
+        # if directory and not dtwvis.test_without_visualization():
+        #     dtwvis.plot_warpingpaths(s1, s2, wps, best_path, filename=directory / 'bug5_warpingpaths.png')
+        #     dtwvis.plot_matrix(wps, shownumbers=True, filename=directory / 'bug5_matrix.png')
+
+
+@numpyonly
+def test_bug6():
+    with util_numpy.test_uses_numpy() as np:
+        s1 = np.array([0.0, 1.0])
+        s2 = np.array([0.0, 0.0])
+
+        psi = [0, 1, 0, 0]
+        d, paths = dtw.warping_paths(s1, s2, psi=psi, use_c=True)
+        assert d == pytest.approx(0.0)
+        d = dtw.distance(s1, s2, psi=psi, use_c=True)
+        assert d == pytest.approx(0.0)
+        d = dtw.distance(s1, s2, psi=psi, use_c=False)
+        assert d == pytest.approx(0.0)
+
+        psi = [0, 0, 0, 1]
+        d, paths = dtw.warping_paths(s1, s2, psi=psi, use_c=True)
+        assert d == pytest.approx(1.0)
+        d = dtw.distance(s1, s2, psi=psi, use_c=True)
+        assert d == pytest.approx(1.0)
+        d = dtw.distance(s1, s2, psi=psi, use_c=False)
+        assert d == pytest.approx(1.0)
+
+
 if __name__ == "__main__":
     directory = Path(os.environ.get('TESTDIR', Path(__file__).parent))
     # with util_numpy.test_uses_numpy() as np:
@@ -322,7 +376,7 @@ if __name__ == "__main__":
     logger.setLevel(logging.WARNING)
     sh = logging.StreamHandler(sys.stdout)
     logger.addHandler(sh)
-    # test_bug1()
+    test_bug1()
     # test_distance1_a()
     # test_distance1_b()
     # test_distance2_a()
@@ -334,5 +388,5 @@ if __name__ == "__main__":
     # test_bug1_psi()
     # test_bug2()
     # test_bug3()
-    test_bug4()
+    # test_bug5_path()
     # test_bug_size()

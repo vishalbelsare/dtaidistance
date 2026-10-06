@@ -1,8 +1,8 @@
-
-subsequence
+Subsequence
 ~~~~~~~~~~~
 
 .. toctree::
-   :caption: Subsequence
 
-   subsequence/dtw
+   subsequence/subsequencesearch
+   subsequence/subsequencealignment
+   subsequence/localconcurrences
